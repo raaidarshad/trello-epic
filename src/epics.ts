@@ -89,6 +89,11 @@ export function isDoneList(name: string): boolean {
   return name.trim().toLowerCase() === 'done';
 }
 
+/** Only cards in this list are offered when choosing a card's epic. */
+export function isEpicsList(name: string): boolean {
+  return name.trim().toLowerCase() === 'epics';
+}
+
 /** Pure classification of an epic's children against the board's open cards. */
 export function classifyChildren(
   childIds: string[],

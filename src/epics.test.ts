@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ancestors, classifyChildren, descendantIds, epicProgress, isDoneList, setParent } from './epics';
+import { ancestors, classifyChildren, descendantIds, epicProgress, isDoneList, isEpicsList, setParent } from './epics';
 
 /** In-memory stand-in for the pluginData + board-read parts of Trello's `t`. */
 function fakeT(cards: TrelloCard[] = [], lists: TrelloList[] = []) {
@@ -20,6 +20,14 @@ describe('isDoneList', () => {
     expect(isDoneList('Done')).toBe(true);
     expect(isDoneList(' done ')).toBe(true);
     expect(isDoneList('Done-ish')).toBe(false);
+  });
+});
+
+describe('isEpicsList', () => {
+  it('matches "Epics" case-insensitively', () => {
+    expect(isEpicsList('Epics')).toBe(true);
+    expect(isEpicsList(' epics ')).toBe(true);
+    expect(isEpicsList('Epic ideas')).toBe(false);
   });
 });
 

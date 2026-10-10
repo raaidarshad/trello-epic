@@ -9,13 +9,13 @@ A personal Trello Power-Up that adds **epics**, nested groups of cards that work
 
 An epic is just a card. Any card can belong to a parent card, and nesting can go as deep as you like (task → song → EP).
 
-- **Epic** (card button): pick the card's parent epic, or remove it from its epic.
+- **Epic** (card button, in the card's Power-Ups section): pick the card's parent epic from the cards in the **Epics** list, or remove it from its epic.
 - **Front of card:** `⤴ Parent` shows which epic a card belongs to. On an epic, `▣ done/total` counts its direct children and turns green when they're all done.
 - **Back of card:** an Epic section with a breadcrumb, the children and their lists, and **+ Add card** for adding existing cards.
 - A child counts as **done** when it's in a list named `Done` or it's archived.
 - Data is stored as card pluginData: `parent` on the child (the source of truth) and a `children` index on the epic. Parent and children must be on the same board.
 
-Tip: keep epic cards in their own "Epics" list.
+Epic cards must be in a list named `Epics` (any capitalisation) to be offered by the Epic button. **+ Add card** on an epic can still add any card.
 
 ## Dev loop
 

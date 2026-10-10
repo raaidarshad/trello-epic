@@ -1,4 +1,4 @@
-import { ancestors, boardIndex, descendantIds, getChildIds, getParent, setParent } from './epics';
+import { ancestors, boardIndex, descendantIds, getChildIds, getParent, isEpicsList, setParent } from './epics';
 
 interface PopupItem {
   text: string;
@@ -6,7 +6,7 @@ interface PopupItem {
   callback: (t: T) => unknown;
 }
 
-function searchablePopup(t: T, title: string, items: PopupItem[], mouseEvent?: MouseEvent) {
+function searchablePopup(t: T, title: string, items: PopupItem[], mouseEvent?: MouseEvent, empty = 'No matching cards') {
   return t.popup({
     title,
     mouseEvent,
@@ -17,16 +17,18 @@ function searchablePopup(t: T, title: string, items: PopupItem[], mouseEvent?: M
     search: {
       count: 15,
       placeholder: 'Search cards…',
-      empty: 'No matching cards',
+      empty,
       searching: 'Searching…',
     },
   });
 }
 
-/** Cards on the board, epics (cards with children) first. */
-async function candidates(t: T, exclude: Set<string>) {
-  const { cards } = await boardIndex(t);
-  const open = [...cards.values()].filter((c) => !exclude.has(c.id));
+/** Cards on the board (optionally only those in matching lists), epics (cards with children) first. */
+async function candidates(t: T, exclude: Set<string>, listFilter?: (name: string) => boolean) {
+  const { cards, lists } = await boardIndex(t);
+  const open = [...cards.values()].filter(
+    (c) => !exclude.has(c.id) && (!listFilter || listFilter(lists.get(c.idList)?.name ?? '')),
+  );
   const isEpic = await Promise.all(open.map(async (c) => (await getChildIds(t, c.id)).length > 0));
   return open
     .map((card, i) => ({ card, epic: isEpic[i] }))
@@ -36,7 +38,7 @@ async function candidates(t: T, exclude: Set<string>) {
 /** Choose (or clear) the epic that `cardId` belongs to. */
 export async function openParentPicker(t: T, cardId: string, mouseEvent?: MouseEvent) {
   const [current, below] = await Promise.all([getParent(t, cardId), descendantIds(t, cardId)]);
-  const options = await candidates(t, new Set([cardId, ...below]));
+  const options = await candidates(t, new Set([cardId, ...below]), isEpicsList);
 
   const items: PopupItem[] = options.map(({ card, epic }) => ({
     text: `${epic ? '▣ ' : ''}${card.name}${card.id === current ? ' ✓' : ''}`,
@@ -55,7 +57,7 @@ export async function openParentPicker(t: T, cardId: string, mouseEvent?: MouseE
       },
     });
   }
-  return searchablePopup(t, 'Set epic', items, mouseEvent);
+  return searchablePopup(t, 'Set epic', items, mouseEvent, 'No matching cards in the Epics list');
 }
 
 /** Add an existing card as a child of `epicId`. */
