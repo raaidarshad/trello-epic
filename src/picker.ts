@@ -1,4 +1,6 @@
-import { ancestors, boardIndex, descendantIds, getChildIds, getParent, isEpicsList, setParent } from './epics';
+import { boardIndex, isDoneList, isEpicsList } from './board';
+import { addDependency, downstreamIds, getDependsOn, removeDependency } from './deps';
+import { ancestors, descendantIds, getChildIds, getParent, setParent } from './epics';
 
 interface PopupItem {
   text: string;
@@ -73,4 +75,23 @@ export async function openAddChildPicker(t: T, epicId: string, mouseEvent?: Mous
     },
   }));
   return searchablePopup(t, 'Add card to epic', items, mouseEvent);
+}
+
+/** Toggle which cards `cardId` depends on. */
+export async function openDependencyPicker(t: T, cardId: string, mouseEvent?: MouseEvent) {
+  const [current, below] = await Promise.all([getDependsOn(t, cardId), downstreamIds(t, cardId)]);
+  const options = await candidates(t, new Set([cardId, ...below]), (list) => !isDoneList(list));
+
+  const items: PopupItem[] = options.map(({ card }) => {
+    const selected = current.includes(card.id);
+    return {
+      text: `${card.name}${selected ? ' ✓' : ''}`,
+      callback: async (t) => {
+        if (selected) await removeDependency(t, cardId, card.id);
+        else await addDependency(t, cardId, card.id);
+        t.closePopup();
+      },
+    };
+  });
+  return searchablePopup(t, 'Depends on', items, mouseEvent);
 }

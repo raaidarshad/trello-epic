@@ -4,32 +4,20 @@
 //                            children after they're archived (the client only
 //                            sees open cards)
 
-export type ChildStatus = 'open' | 'done' | 'archived';
-
-export interface ChildInfo {
-  id: string;
-  name?: string;
-  listName?: string;
-  status: ChildStatus;
-}
+import { type Board, type CardInfo, boardIndex, cardStatus, getIds, walkIds, writeIds } from './board';
 
 export interface Progress {
   done: number;
   total: number;
-  children: ChildInfo[];
+  children: CardInfo[];
 }
 
 export async function getParent(t: T, id: string): Promise<string | null> {
   return (await t.get(id, 'shared', 'parent')) ?? null;
 }
 
-export async function getChildIds(t: T, id: string): Promise<string[]> {
-  return (await t.get(id, 'shared', 'children')) ?? [];
-}
-
-async function writeChildIds(t: T, id: string, ids: string[]): Promise<void> {
-  if (ids.length) await t.set(id, 'shared', 'children', ids);
-  else await t.remove(id, 'shared', 'children');
+export function getChildIds(t: T, id: string): Promise<string[]> {
+  return getIds(t, id, 'children');
 }
 
 /** Move `childId` under `parentId`, or detach it when `parentId` is null. */
@@ -47,11 +35,11 @@ export async function setParent(t: T, childId: string, parentId: string | null):
 
   if (old) {
     const kids = await getChildIds(t, old);
-    await writeChildIds(t, old, kids.filter((k) => k !== childId));
+    await writeIds(t, old, 'children', kids.filter((k) => k !== childId));
   }
   if (parentId) {
     const kids = await getChildIds(t, parentId);
-    if (!kids.includes(childId)) await writeChildIds(t, parentId, [...kids, childId]);
+    if (!kids.includes(childId)) await writeIds(t, parentId, 'children', [...kids, childId]);
   }
 }
 
@@ -67,62 +55,18 @@ export async function ancestors(t: T, id: string): Promise<string[]> {
 }
 
 /** Every card below `id` at any depth (not including `id`). */
-export async function descendantIds(t: T, id: string): Promise<Set<string>> {
-  const found = new Set<string>();
-  let frontier = [id];
-  while (frontier.length) {
-    const next: string[] = [];
-    for (const kids of await Promise.all(frontier.map((f) => getChildIds(t, f)))) {
-      for (const k of kids) {
-        if (k !== id && !found.has(k)) {
-          found.add(k);
-          next.push(k);
-        }
-      }
-    }
-    frontier = next;
-  }
-  return found;
-}
-
-export function isDoneList(name: string): boolean {
-  return name.trim().toLowerCase() === 'done';
-}
-
-/** Only cards in this list are offered when choosing a card's epic. */
-export function isEpicsList(name: string): boolean {
-  return name.trim().toLowerCase() === 'epics';
+export function descendantIds(t: T, id: string): Promise<Set<string>> {
+  return walkIds(t, id, 'children');
 }
 
 /** Pure classification of an epic's children against the board's open cards. */
-export function classifyChildren(
-  childIds: string[],
-  openCards: Map<string, TrelloCard>,
-  lists: Map<string, TrelloList>,
-): Progress {
-  const children = childIds.map((id): ChildInfo => {
-    const card = openCards.get(id);
-    if (!card) return { id, status: 'archived' };
-    const listName = lists.get(card.idList)?.name;
-    const status = listName && isDoneList(listName) ? 'done' : 'open';
-    return { id, name: card.name, listName, status };
-  });
+export function classifyChildren(childIds: string[], openCards: Board['cards'], lists: Board['lists']): Progress {
+  const children = childIds.map((id) => cardStatus(id, openCards, lists));
   const done = children.filter((c) => c.status !== 'open').length;
   return { done, total: children.length, children };
 }
 
-export async function boardIndex(t: T) {
-  const [cards, lists]: [TrelloCard[], TrelloList[]] = await Promise.all([
-    t.cards('id', 'name', 'idList'),
-    t.lists('id', 'name'),
-  ]);
-  return {
-    cards: new Map(cards.map((c) => [c.id, c])),
-    lists: new Map(lists.map((l) => [l.id, l])),
-  };
-}
-
-export async function epicProgress(t: T, epicId: string, board?: Awaited<ReturnType<typeof boardIndex>>): Promise<Progress> {
+export async function epicProgress(t: T, epicId: string, board?: Board): Promise<Progress> {
   const { cards, lists } = board ?? (await boardIndex(t));
   const ids = await getChildIds(t, epicId);
   // Drop index entries for open cards that have since been re-parented elsewhere.
