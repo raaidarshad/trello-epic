@@ -11,7 +11,7 @@ export default defineConfig(({ command }) => ({
     rollupOptions: {
       input: {
         main: 'index.html',
-        popup: 'popup.html',
+        section: 'section.html',
       },
     },
   },
